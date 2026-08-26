@@ -1,0 +1,39 @@
+{
+  "configVersion": 1,
+  "appId": "template",
+  "buildTime": {
+    "startUrl": "https://example.com",
+    "allowedHosts": ["example.com"],
+    "allowSubdomains": true
+  },
+  "display": {
+    "fullscreen": false,
+    "orientation": "unspecified",
+    "themeColor": "#0F172A",
+    "backgroundColor": "#FFFFFF",
+    "lightStatusBarIcons": true
+  },
+  "splash": {
+    "backgroundColor": "#FFFFFF",
+    "showLogo": true,
+    "maxWaitMs": 10000
+  },
+  "behavior": {
+    "pullToRefresh": true,
+    "externalLinksInBrowser": true,
+    "userAgentSuffix": "ServbizApp/1.0",
+    "allowFileUploads": true,
+    "allowGeolocation": false,
+    "allowCamera": false,
+    "allowMicrophone": false,
+    "allowMixedContent": false,
+    "confirmExitOnBack": false,
+    "openPopupsInApp": true,
+    "handleDownloads": true
+  },
+  "remoteConfig": {
+    "enabled": false,
+    "url": null,
+    "timeoutMs": 2500
+  }
+}

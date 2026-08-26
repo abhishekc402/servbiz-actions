@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Can't reach the site</title>
+  <style>
+    :root {
+      --accent: #0f172a;
+      --bg: #ffffff;
+      --fg: #1f2937;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    main { width: 100%; max-width: 22rem; text-align: center; }
+    .glyph {
+      width: 56px; height: 56px; margin: 0 auto 20px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--accent);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
+    p { margin: 0 0 24px; color: var(--muted); font-size: 0.9375rem; }
+    button {
+      appearance: none; border: 0; cursor: pointer;
+      width: 100%; min-height: 48px; padding: 0 20px;
+      border-radius: 12px;
+      background: var(--accent); color: #fff;
+      font: inherit; font-weight: 600;
+    }
+    button:active { opacity: 0.85; }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .detail {
+      margin: 16px 0 0; font-size: 0.75rem; color: var(--muted);
+      word-break: break-word; opacity: 0.8;
+    }
+    /* The `hidden` attribute does not hide SVG elements: the UA stylesheet's
+       [hidden] { display: none } rule applies to the HTML namespace, so an
+       <svg hidden> still paints. Verified on Android WebView 124, where both
+       glyphs rendered on top of each other. Hence an explicit class. */
+    .hide { display: none !important; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0b0f14; --fg: #e5e7eb; --muted: #9ca3af; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="glyph" aria-hidden="true">
+      <svg id="glyphOffline" width="28" height="28" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55" />
+        <path d="M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9" />
+        <path d="M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0" />
+        <path d="M12 20h.01" />
+      </svg>
+      <svg id="glyphServer" class="hide" width="28" height="28" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 9v4M12 17h.01" />
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      </svg>
+    </div>
+    <h1 id="title">Something went wrong</h1>
+    <p id="body">The site could not be loaded. Please try again.</p>
+    <button id="retry" type="button">Try again</button>
+    <p class="detail" id="detail" hidden></p>
+  </main>
+
+  <script>
+    // Styling and copy arrive as query params from MainActivity so this page
+    // stays a static asset with no build-time templating and no JS bridge.
+    (function () {
+      var q = new URLSearchParams(location.search);
+
+      var accent = q.get('accent');
+      if (accent && /^#[0-9a-fA-F]{6}$/.test(accent)) {
+        document.documentElement.style.setProperty('--accent', accent);
+      }
+
+      // Two distinct failures, two distinct explanations. Telling someone to
+      // "check your internet connection" when the site returned a 500 sends them
+      // off to reboot a working router.
+      if (q.get('offline') === '1') {
+        document.getElementById('title').textContent = "You're offline";
+        document.getElementById('body').textContent =
+          'This app needs a connection to load. Reconnect and try again.';
+      } else {
+        document.getElementById('title').textContent = "The site isn't responding";
+        document.getElementById('body').textContent =
+          'Your connection looks fine, so this is a problem at the other end. ' +
+          'Trying again in a moment usually works.';
+        document.getElementById('glyphOffline').classList.add('hide');
+        document.getElementById('glyphServer').classList.remove('hide');
+      }
+
+      var detail = q.get('detail');
+      if (detail) {
+        var el = document.getElementById('detail');
+        el.textContent = detail;
+        el.hidden = false;
+      }
+
+      // Sentinel URL intercepted by AppWebViewClient. Deliberately not a
+      // @JavascriptInterface -- no native surface is exposed to page content.
+      //
+      // The counter makes each press a distinct URL. Assigning location.href the
+      // same value twice is treated as a no-op, which silently broke every retry
+      // after the first.
+      var attempt = 0;
+      document.getElementById('retry').addEventListener('click', function () {
+        attempt += 1;
+        location.href = 'servbiz-shell://retry?n=' + attempt + '&t=' + Date.now();
+      });
+    })();
+  </script>
+</body>
+</html>

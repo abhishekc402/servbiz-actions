@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Camera captures for <input type="file" accept="image/*"> -->
+    <cache-path name="shell_captures" path="captures/" />
+</paths>

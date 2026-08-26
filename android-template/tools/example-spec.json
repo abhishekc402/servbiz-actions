@@ -1,0 +1,47 @@
+{
+  "appId": "b7c1e2f0-4d5a-4c8e-9f10-2a3b4c5d6e7f",
+  "applicationId": "com.servbiz.app.acme_a1b2c3",
+  "appName": "Acme Services",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+
+  "startUrl": "https://acme-services.example.com/",
+  "allowedHosts": ["acme-services.example.com"],
+  "allowSubdomains": true,
+
+  "display": {
+    "fullscreen": false,
+    "orientation": "unspecified",
+    "themeColor": "#0F172A",
+    "backgroundColor": "#FFFFFF",
+    "lightStatusBarIcons": true
+  },
+
+  "splash": {
+    "backgroundColor": "#0F172A",
+    "showLogo": true,
+    "maxWaitMs": 10000
+  },
+
+  "behavior": {
+    "pullToRefresh": true,
+    "externalLinksInBrowser": true,
+    "userAgentSuffix": "ServbizApp/1.0",
+    "allowFileUploads": true,
+    "allowGeolocation": false,
+    "allowCamera": false,
+    "allowMicrophone": false,
+    "allowMixedContent": false,
+    "confirmExitOnBack": false,
+    "openPopupsInApp": true,
+    "handleDownloads": true
+  },
+
+  "remoteConfig": {
+    "enabled": false,
+    "url": null,
+    "timeoutMs": 2500
+  },
+
+  "iconBackgroundColor": "#0F172A"
+}

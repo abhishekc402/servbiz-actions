@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.AppShell" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>
+
+    <!--
+      Launch theme. On API 31+ the system splash is drawn from these attributes
+      before any of our code runs, so the colour has to come from the compiled
+      resource that build.gradle.kts generates. That makes the SYSTEM splash
+      colour a rebuild-tier setting.
+
+      The in-app splash overlay in activity_main.xml reads splash.backgroundColor
+      from config.json at runtime instead, so the fast-patch path can still
+      restyle the part of the launch experience the user actually spends time
+      looking at. Keep the two roughly in sync when generating an app.
+    -->
+    <style name="Theme.AppShell.Launch" parent="Theme.AppShell">
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">
+            @color/splash_background
+        </item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">
+            @mipmap/ic_launcher
+        </item>
+    </style>
+</resources>

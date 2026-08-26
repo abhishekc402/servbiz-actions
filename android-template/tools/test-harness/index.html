@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Shell harness</title>
+  <style>
+    /* Kept deliberately compact so the whole harness fits inside one viewport.
+       The driver taps by coordinate, and scrolling first then assuming the scroll
+       landed exactly is not reliable -- so we avoid needing to scroll at all. */
+    body { font: 14px/1.35 -apple-system, Roboto, sans-serif; margin: 0; padding: 10px 12px 16px; }
+    h1 { font-size: 1rem; margin: 0; }
+    h2 { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+         color: #6b7280; margin: 12px 0 5px; }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; }
+    a, button, label.btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 11px; min-height: 42px; border-radius: 7px;
+      background: #0f172a; color: #fff; text-decoration: none; border: 0;
+      font: inherit; font-weight: 600; font-size: 13px; box-sizing: border-box;
+    }
+    pre { background: #f3f4f6; padding: 6px 8px; border-radius: 6px; font-size: 10px;
+          margin: 5px 0 0; white-space: pre-wrap; word-break: break-all; }
+    input[type=text] { width: 100%; padding: 10px; font: inherit; box-sizing: border-box;
+                       border: 1px solid #d1d5db; border-radius: 7px; }
+    #summary { font: 12px ui-monospace, monospace; padding: 6px 8px; border-radius: 6px; }
+    .ok { background: #ecfdf5; color: #047857; } .bad { background: #fef2f2; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1 id="marker">HARNESS_LOADED</h1>
+  <div id="summary">running passive checks...</div>
+
+  <h2>Upload</h2>
+  <div class="row">
+    <label class="btn">any<input id="fAny" type="file" hidden></label>
+    <label class="btn">image<input id="fImg" type="file" accept="image/*" hidden></label>
+    <label class="btn">multi<input id="fMulti" type="file" multiple hidden></label>
+    <a href="/report.pdf" id="dl" download>download</a>
+  </div>
+  <pre id="fileOut">no file chosen</pre>
+
+  <h2>Navigation</h2>
+  <div class="row">
+    <a href="/second" id="sameHost">same host</a>
+    <a href="https://example.net/" id="offHost">off host</a>
+    <a href="/second" target="_blank" id="popup">_blank</a>
+    <a href="/boom" id="boom">500</a>
+  </div>
+
+  <h2>Intent handoff</h2>
+  <div class="row">
+    <a href="upi://pay?pa=test@upi&pn=Test&am=1.00&cu=INR" id="upi">upi:</a>
+    <a href="tel:+911234567890" id="tel">tel:</a>
+    <a href="mailto:a@b.com" id="mail">mailto:</a>
+    <a href="#" id="intentFallback">intent+fallback</a>
+    <!--
+      Attempts the intent-scheme redirect attack: an intent: URL naming a
+      non-exported component directly. The shell must strip the component and
+      resolve by scheme instead, so this should land in the stub's public
+      activity and never in its private one.
+    -->
+    <a href="intent://evil/#Intent;scheme=upi;component=com.servbiz.upistub/com.servbiz.upistub.PrivateActivity;end"
+       id="intentHijack">intent hijack</a>
+  </div>
+
+  <h2>Geolocation</h2>
+  <div class="row"><button id="geo" type="button">request position</button></div>
+  <pre id="geoOut">not requested</pre>
+
+  <h2>Keyboard</h2>
+  <input type="text" id="typeHere" placeholder="tap to raise keyboard" />
+
+  <script>
+    const report = (name, pass, detail) =>
+      fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, pass: !!pass, detail: String(detail ?? '') }),
+      }).catch(() => {});
+
+    // --- passive environment checks -----------------------------------------
+    // Results go to the server; only a one-line summary is rendered, to keep the
+    // page short enough that every control stays on screen.
+    (function () {
+      const out = [];
+      const t = (name, pass, detail) => { out.push({ name, pass, detail }); report(name, pass, detail); };
+      const ua = navigator.userAgent;
+
+      t('userAgentSuffix', /ServbizShellTest\/9\.9/.test(ua), ua);
+      t('isAndroidWebView', /Android/.test(ua), ua.slice(0, 50));
+      try { localStorage.setItem('p', '1'); t('localStorage', localStorage.getItem('p') === '1', 'ok'); }
+      catch (e) { t('localStorage', false, e.message); }
+      try { sessionStorage.setItem('p', '1'); t('sessionStorage', sessionStorage.getItem('p') === '1', 'ok'); }
+      catch (e) { t('sessionStorage', false, e.message); }
+      document.cookie = 'probe=v1; path=/';
+      t('cookies', /probe=v1/.test(document.cookie), document.cookie || '(empty)');
+      t('viewport', innerWidth > 0, `${innerWidth}x${innerHeight} dpr${devicePixelRatio}`);
+      t('origin', /^https?:\/\//.test(location.origin), location.origin);
+      t('geolocationApiPresent', 'geolocation' in navigator, typeof navigator.geolocation);
+
+      // Chromium refuses geolocation, camera and mic on insecure origins before
+      // the app's WebChromeClient is ever consulted. http://127.0.0.1 counts as
+      // trustworthy, http://10.0.2.2 does not -- which is why the emulator is
+      // driven through `adb reverse` rather than the host loopback alias.
+      t('secureContext', isSecureContext === true,
+        `isSecureContext=${isSecureContext} origin=${location.origin}`);
+
+      // Built from the live origin so the fallback target follows whatever host
+      // the harness is actually served from.
+      const fb = encodeURIComponent(`${location.origin}/fallback`);
+      document.getElementById('intentFallback').href =
+        `intent://scan/#Intent;scheme=zxing;package=com.nonexistent.app;` +
+        `S.browser_fallback_url=${fb};end`;
+
+      const bad = out.filter((r) => !r.pass);
+      const el = document.getElementById('summary');
+      el.className = bad.length ? 'bad' : 'ok';
+      el.textContent = bad.length
+        ? `${bad.length}/${out.length} FAILED: ${bad.map((b) => b.name).join(', ')}`
+        : `passive ${out.length}/${out.length} ok · ${innerWidth}x${innerHeight}`;
+    })();
+
+    // --- file inputs -------------------------------------------------------
+    for (const id of ['fAny', 'fImg', 'fMulti']) {
+      document.getElementById(id).addEventListener('change', (e) => {
+        const files = [...e.target.files];
+        const desc = files.map((f) => `${f.name} ${f.type || '?'} ${f.size}B`).join(' | ');
+        document.getElementById('fileOut').textContent = desc || 'cancelled (0 files)';
+        report(`upload:${id}`, files.length > 0, desc || 'no files');
+        if (files.length) {
+          const fd = new FormData();
+          files.forEach((f) => fd.append('f', f, f.name));
+          fetch('/upload', { method: 'POST', body: fd }).catch(() => {});
+        }
+      });
+    }
+
+    // --- geolocation -------------------------------------------------------
+    document.getElementById('geo').addEventListener('click', () => {
+      document.getElementById('geoOut').textContent = 'requesting...';
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          const d = `${p.coords.latitude},${p.coords.longitude}`;
+          document.getElementById('geoOut').textContent = d;
+          report('geolocation', true, d);
+        },
+        (err) => {
+          document.getElementById('geoOut').textContent = `error ${err.code}: ${err.message}`;
+          report('geolocation', false, `${err.code} ${err.message}`);
+        },
+        { timeout: 12000 }
+      );
+    });
+
+    // --- layout publication ------------------------------------------------
+    // Element centres in CSS pixels, so the host driver taps real targets.
+    // devicePixelRatio is reported but not trusted: useWideViewPort makes the CSS
+    // viewport width and the physical width disagree, so the host derives scale
+    // from physicalWidth / innerWidth instead.
+    (function () {
+      const ids = ['fAny', 'fImg', 'fMulti', 'dl', 'sameHost', 'offHost', 'popup',
+                   'boom', 'upi', 'tel', 'mail', 'intentFallback', 'intentHijack',
+                   'geo', 'typeHere'];
+      const elements = {};
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const target = el.type === 'file' ? el.closest('label') : el;
+        const r = target.getBoundingClientRect();
+        elements[id] = {
+          x: Math.round(r.left + r.width / 2),
+          y: Math.round(r.top + r.height / 2),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        };
+      }
+      fetch('/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          innerWidth, innerHeight, devicePixelRatio,
+          docHeight: document.documentElement.scrollHeight,
+          fitsInViewport: document.documentElement.scrollHeight <= innerHeight,
+          elements,
+        }),
+      }).catch(() => {});
+    })();
+
+    report('pageLoaded', true, location.href);
+  </script>
+</body>
+</html>

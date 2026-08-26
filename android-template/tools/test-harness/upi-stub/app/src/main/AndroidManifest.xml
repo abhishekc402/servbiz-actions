@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Stands in for a UPI app (PhonePe, GPay, Paytm) on an emulator.
+
+  WHY THIS EXISTS
+    The single highest-risk path in the shell is handing a upi:// link to a
+    payment app: get it wrong and the customer's checkout button does nothing,
+    with no error. No emulator image ships a real UPI app, and Razorpay's test
+    mode never fires a UPI intent at all; it shows a mock page instead. So
+    without this, that code path could only be exercised on a physical phone
+    with live keys and real money.
+
+    This registers for upi:// and reports the exact URI it was handed, which
+    proves OUR half of the handoff: recognition, intent sanitisation, and launch.
+    It does not prove the PSP's half (a real app paying and deep-linking back);
+    that still needs hardware.
+
+  The intent-filter mirrors what a real UPI app declares: VIEW + BROWSABLE for
+  the upi scheme. BROWSABLE matters because the shell adds that category when
+  sanitising intents parsed from page content, so a filter without it would not
+  match.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:label="UPI Stub"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".StubActivity"
+            android:exported="true"
+            android:label="UPI Stub"
+            android:theme="@android:style/Theme.Material.Light.Dialog.MinWidth">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="upi" />
+            </intent-filter>
+
+            <!-- A couple of other schemes worth being able to exercise. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="phonepe" />
+                <data android:scheme="tez" />
+                <data android:scheme="paytmmp" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Not exported and no intent filter. Reachable only by an intent that
+          names it explicitly, which is exactly what an unsanitised
+          Intent.parseUri result can do. If it is ever reached from page content,
+          the shell's intent sanitisation has regressed.
+        -->
+        <activity
+            android:name=".PrivateActivity"
+            android:exported="false" />
+    </application>
+</manifest>
