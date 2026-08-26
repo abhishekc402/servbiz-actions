@@ -1,0 +1,17 @@
+# gradlew.bat is the Windows launcher and needs CRLF endings. It arrived here via
+# the web upload form, which stripped all 94 of them, and git would not restore
+# them on its own. Pinned so neither a checkout nor another upload can flatten it
+# again.
+*.bat text eol=crlf
+
+# gradlew is the POSIX launcher and must stay LF, whatever the checkout platform,
+# or the shell fails on the shebang.
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Binary, so git should never try to normalise or diff these as text.
+*.png binary
+*.jpg binary
+*.jar binary
+*.keystore binary
+*.apk binary
