@@ -1,0 +1,18 @@
+.gradle/
+build/
+app/build/
+local.properties
+
+# Test-harness run state (reports, request log, measured layout)
+tools/test-harness/.state/
+*.iml
+.idea/
+.DS_Store
+
+# Never commit signing material
+*.jks
+*.keystore
+signing.properties
+
+# Kotlin compiler scratch
+.kotlin/

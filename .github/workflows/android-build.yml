@@ -1,0 +1,152 @@
+name: Android app build
+
+# Drains the mobile_app_builds queue. Triggered by the API when a customer creates
+# or edits an app, plus a periodic sweep as a safety net.
+#
+# THIS REPOSITORY IS PUBLIC
+#   It is public so that Actions minutes are free -- GitHub bills no minutes for
+#   standard runners on public repositories, which is what removes the per-customer
+#   build quota the private setup would otherwise have needed.
+#
+#   Two consequences follow, and both are already handled:
+#
+#     Secrets are still safe. Repository visibility does not expose them: they are
+#     encrypted, forks never receive them, and the only triggers here are
+#     workflow_dispatch and schedule, neither of which a fork can fire. Do not add
+#     a pull_request trigger to this file -- that is the one change that would let
+#     an outsider's code run beside these secrets.
+#
+#     Logs are NOT private. Anyone signed in to GitHub can read the output of these
+#     runs. The worker and the preflight were therefore changed to print no
+#     customer-identifying detail: no package id, no app name, no object key, no
+#     failure text, no customer count. Only opaque build UUIDs. If you add logging
+#     here, assume a competitor is reading it.
+#
+#   Irreducible: the number and timing of runs is public, so build volume is
+#   visible. That was accepted as the price of free minutes.
+#
+# SECURITY POSTURE
+#   This job decrypts customer signing keystores. Whoever controls it can produce
+#   an APK that Android accepts as a genuine update to any customer's app, on their
+#   users' phones. That shapes three choices here:
+#
+#     1. Only first-party actions/* steps are used. No third-party action runs in
+#        this workflow, because a compromised one would sit directly in the signing
+#        path. If you add one, pin it to a full commit SHA, never a tag.
+#     2. The GITHUB_TOKEN gets contents:read and nothing more.
+#     3. Secrets live in an environment, so you can require approval or restrict
+#        which branches may access them in the repo settings.
+#
+#   Nothing here echoes a secret. The worker logs URL paths only, never query
+#   strings, because those routinely carry session tokens.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: What triggered this run (for the run list)
+        required: false
+        default: api
+
+  # Safety net. If a dispatch is ever lost -- a network blip in the API, a token
+  # expiring -- queued builds would otherwise sit forever. This costs one short
+  # run per interval to find an empty queue.
+  schedule:
+    - cron: '*/30 * * * *'
+
+# Never two runs at once. The database claim is already safe under concurrency
+# (FOR UPDATE SKIP LOCKED plus leases), so this is purely about not paying twice
+# for the same work. Queued rather than cancelled: cancelling would abandon a
+# build that is already partway through.
+concurrency:
+  group: android-build
+  cancel-in-progress: false
+
+# contents:read and nothing more. An empty permissions block looks stricter but
+# breaks actions/checkout, which needs read access to clone: git fails with exit
+# code 128, an auth error whose message never mentions permissions.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    environment: android-build
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SERVBIZ_MASTER_KEY: ${{ secrets.SERVBIZ_MASTER_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      # Well inside the 50-minute job timeout, so the worker stops itself and
+      # leaves the rest queued instead of being killed mid-build.
+      WORKER_BUDGET_MS: '2100000'
+      WORKER_MAX_JOBS: '10'
+      WORKER_ID: gha-${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # 22 minimum, not 20. @supabase/supabase-js constructs a RealtimeClient
+      # inside createClient() whether or not you use realtime, and that needs a
+      # global WebSocket -- which Node only ships natively from 22. On 20 it fails
+      # at client construction with "Node.js 20 detected without native WebSocket
+      # support", before any query runs.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The runner image ships an Android SDK, but not necessarily the exact
+      # build-tools this template pins. Installing explicitly keeps the build
+      # reproducible instead of dependent on whatever the image happens to carry.
+      - name: Ensure Android SDK packages
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" version
+
+      # Without this every run re-resolves AGP, Kotlin and the AndroidX
+      # dependencies -- several hundred megabytes, and the difference between a
+      # ~2 minute run and a ~5 minute one. Directly a bill, not just latency.
+      - name: Restore Gradle cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android-template/**/*.gradle.kts', 'android-template/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install worker dependencies
+        working-directory: android-template
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Preflight
+        working-directory: android-template
+        run: node tools/check-connectivity.mjs
+
+      - name: Drain the build queue
+        working-directory: android-template
+        run: node tools/worker.mjs --drain
+
+      # No failure-diagnostics artifact here, unlike the private version of this
+      # workflow this replaced.
+      #
+      # Artifacts on a public repository are downloadable by anyone, and Gradle
+      # reports quote the package id, the start URL and absolute paths. The full
+      # failure message is already written to mobile_app_builds.error, which sits
+      # behind authentication, so nothing is lost -- read failures there.

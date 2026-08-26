@@ -1,0 +1,23 @@
+# Never commit credentials. This repository is public: anything committed here is
+# world-readable immediately and stays recoverable from history afterwards.
+.env
+.env.*
+*.keystore
+*.jks
+*.p12
+
+# Build output
+android-template/build/
+android-template/app/build/
+android-template/.gradle/
+android-template/local.properties
+
+# Worker scratch space and local artifacts
+android-template/.artifacts/
+android-template/.work/
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
