@@ -280,6 +280,73 @@ async function main() {
     check('full build: config written back to the app row', db.appUpdates.length === 1,
           Object.keys(db.appUpdates[0] ?? {}).join(', '));
 
+    // ---- 2a. a custom launcher icon ---------------------------------------
+    //
+    // The one link that nothing else covers: whether the worker actually pulls the
+    // uploaded image out of storage, runs make-icons over it, and gets the result
+    // into the APK. Everything either side of that is tested in isolation.
+    {
+      const { encodePng, decodePng } = await import('./lib/png.mjs');
+
+      // A distinctive flat colour, so finding it in the built icon proves it came
+      // from here rather than from the generated placeholder.
+      const SIDE = 512;
+      const MARK = [222, 11, 99];
+      const rgba = Buffer.alloc(SIDE * SIDE * 4);
+      for (let i = 0; i < rgba.length; i += 4) {
+        rgba[i] = MARK[0]; rgba[i + 1] = MARK[1]; rgba[i + 2] = MARK[2]; rgba[i + 3] = 255;
+      }
+      const iconKey = `mobile-apps/${APP_ID}/icon-source.png`;
+      await storage.put(iconKey, encodePng({ width: SIDE, height: SIDE, rgba }), 'image/png');
+
+      const iconDb = new FakeDb();
+      iconDb.keys.set(APP_ID, envelope);
+      iconDb.app.icon_source_key = iconKey;
+      iconDb.app.current_artifact_key = null;
+      const iconWorker = new workerModule.Worker(iconDb, storage, { once: true });
+      iconDb.enqueue('full');
+      await iconWorker.run();
+
+      const iconFinish = iconDb.finishCalls.at(-1);
+      check('custom icon: build published', iconFinish?.p_success === true,
+            iconFinish?.p_error ?? '');
+
+      if (iconFinish?.p_success) {
+        const built = join(workDir, 'icon-build.apk');
+        writeFileSync(built, await storage.get(iconFinish.p_artifact_key));
+        const listing = execFileSync('unzip', ['-Z1', built], { encoding: 'utf8' }).split('\n');
+        const entry = listing.find((l) => /^res\/mipmap-xxhdpi(-v\d+)?\/ic_launcher\.png$/.test(l));
+        check('custom icon: xxhdpi launcher present in the APK', Boolean(entry), entry ?? 'not found');
+
+        if (entry) {
+          const dir = mkdtempSync(join(tmpdir(), 'icon-check-'));
+          execFileSync('unzip', ['-q', '-o', built, entry, '-d', dir]);
+          const png = decodePng(readFileSync(join(dir, entry)));
+          const centre = ((png.height >> 1) * png.width + (png.width >> 1)) * 4;
+          const near = (a, b) => Math.abs(a - b) <= 6;
+          check('custom icon: the uploaded image is what shipped',
+                near(png.rgba[centre], MARK[0]) &&
+                near(png.rgba[centre + 1], MARK[1]) &&
+                near(png.rgba[centre + 2], MARK[2]),
+                `centre rgb=${png.rgba[centre]},${png.rgba[centre + 1]},${png.rgba[centre + 2]}` +
+                ` expected ~${MARK.join(',')}`);
+          rmSync(dir, { recursive: true, force: true });
+        }
+      }
+
+      // An unreadable source must cost the icon, not the build.
+      const brokenDb = new FakeDb();
+      brokenDb.keys.set(APP_ID, envelope);
+      brokenDb.app.icon_source_key = `mobile-apps/${APP_ID}/does-not-exist.png`;
+      brokenDb.app.current_artifact_key = null;
+      const brokenWorker = new workerModule.Worker(brokenDb, storage, { once: true });
+      brokenDb.enqueue('full');
+      await brokenWorker.run();
+      check('custom icon: a missing source still builds',
+            brokenDb.finishCalls.at(-1)?.p_success === true,
+            brokenDb.finishCalls.at(-1)?.p_error ?? 'built with the placeholder');
+    }
+
     // Without this the build row's version_code and build_number stay null, and a
     // per-build download cannot name the version it is serving.
     const versionWrite = db.buildUpdates.find((u) => u.version_code != null);

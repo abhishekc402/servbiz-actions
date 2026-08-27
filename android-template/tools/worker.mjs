@@ -161,6 +161,43 @@ async function openKeystore(appId, envelope) {
   }
 }
 
+/**
+ * Generates launcher icons from the customer's uploaded image, if there is one.
+ *
+ * Returns an `icons` manifest ready to drop into a build spec or a patch, or null
+ * when the app has no custom icon and should keep the generated placeholder.
+ *
+ * Regenerated on every build rather than stored: the icons are derived from the
+ * source image and the icon background colour, and caching 15 files per app to
+ * save roughly a second of work would mean keeping them in step with both inputs.
+ *
+ * A failure here is deliberately not fatal. An unreadable source image should cost
+ * the customer their custom icon, not their build -- the placeholder is a valid
+ * icon and the app is otherwise correct.
+ */
+async function prepareIcons({ app, workDir, storage, background }) {
+  if (!app.icon_source_key) return null;
+
+  try {
+    const source = join(workDir, 'icon-source.png');
+    writeFileSync(source, await storage.get(app.icon_source_key), { mode: 0o600 });
+
+    const outDir = join(workDir, 'icons');
+    const stdout = await runNode('make-icons.mjs', [
+      '--source', source,
+      '--out', outDir,
+      '--background', background,
+    ]);
+
+    const icons = JSON.parse(stdout);
+    log(`  generated icons for ${Object.keys(icons).length} densities`);
+    return icons;
+  } catch (e) {
+    log(`  ! custom icon skipped: ${String(e.message ?? e).split('\n')[0]}`);
+    return null;
+  }
+}
+
 /** Composes a full build spec from the app row plus the job's requested changes. */
 function composeSpec(app, jobSpec, versionCode, signing) {
   const requested = jobSpec ?? {};
@@ -187,9 +224,16 @@ function composeSpec(app, jobSpec, versionCode, signing) {
   };
 }
 
-async function runFullBuild({ app, job, signing, workDir }) {
+async function runFullBuild({ app, job, signing, workDir, storage }) {
   const versionCode = job.allocatedVersionCode;
   const spec = composeSpec(app, job.spec, versionCode, signing);
+
+  // Composited against the background the icon will actually sit on, so a
+  // transparent logo matches the adaptive background layer.
+  const icons = await prepareIcons({
+    app, workDir, storage, background: spec.iconBackgroundColor,
+  });
+  if (icons) spec.icons = icons;
   const specPath = join(workDir, 'spec.json');
   writeFileSync(specPath, JSON.stringify(spec, null, 2), { mode: 0o600 });
 
@@ -214,6 +258,17 @@ async function runPatch({ app, job, signing, workDir, storage }) {
   writeFileSync(base, await storage.get(app.current_artifact_key), { mode: 0o600 });
 
   const patch = { ...(job.spec ?? {}), signing };
+
+  // The stored colour, not a requested one: iconBackgroundColor is compiled into
+  // resources.arsc, so a patch cannot change it, and compositing against a colour
+  // the APK does not actually use would leave the legacy icons mismatched.
+  const icons = await prepareIcons({
+    app,
+    workDir,
+    storage,
+    background: app.config?.iconBackgroundColor ?? '#FFFFFF',
+  });
+  if (icons) patch.icons = icons;
   const patchPath = join(workDir, 'patch.json');
   writeFileSync(patchPath, JSON.stringify(patch, null, 2), { mode: 0o600 });
 
@@ -419,7 +474,7 @@ export class Worker {
 
       const built =
         job.kind === 'full'
-          ? await runFullBuild({ app, job, signing: opened.signing, workDir })
+          ? await runFullBuild({ app, job, signing: opened.signing, workDir, storage: this.storage })
           : await runPatch({ app, job, signing: opened.signing, workDir, storage: this.storage });
 
       // Checked before upload as well as before finish: an abandoned build should
