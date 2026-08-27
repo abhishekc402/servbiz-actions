@@ -32,7 +32,12 @@ data class AppConfig(
         val orientation: String,
         val themeColor: Int,
         val backgroundColor: Int,
-        val lightStatusBarIcons: Boolean
+        val lightStatusBarIcons: Boolean,
+        val navigationBarColor: Int,
+        val hideStatusBar: Boolean,
+        val hideNavigationBar: Boolean,
+        /** "default" | "shortEdges" | "never" */
+        val cutoutMode: String
     )
 
     data class Splash(
@@ -52,7 +57,8 @@ data class AppConfig(
         val allowMixedContent: Boolean,
         val confirmExitOnBack: Boolean,
         val openPopupsInApp: Boolean,
-        val handleDownloads: Boolean
+        val handleDownloads: Boolean,
+        val keepScreenOn: Boolean
     )
 
     data class Remote(
@@ -83,7 +89,20 @@ data class AppConfig(
             configVersion = 0,
             appId = "unknown",
             buildTime = BuildTime("about:blank", emptyList(), false),
-            display = Display(false, "unspecified", 0xFF0F172A.toInt(), Color.WHITE, true),
+            // Named rather than positional: this list grew past the point where
+            // position is readable, and a silent argument swap between two Ints or
+            // two Booleans would compile.
+            display = Display(
+                fullscreen = false,
+                orientation = "unspecified",
+                themeColor = 0xFF0F172A.toInt(),
+                backgroundColor = Color.WHITE,
+                lightStatusBarIcons = true,
+                navigationBarColor = 0xFF0F172A.toInt(),
+                hideStatusBar = false,
+                hideNavigationBar = false,
+                cutoutMode = "default"
+            ),
             splash = Splash(Color.WHITE, true, 10_000L),
             behavior = Behavior(
                 pullToRefresh = true,
@@ -96,7 +115,8 @@ data class AppConfig(
                 allowMixedContent = false,
                 confirmExitOnBack = false,
                 openPopupsInApp = true,
-                handleDownloads = true
+                handleDownloads = true,
+                keepScreenOn = false
             ),
             remoteConfig = Remote(enabled = false, url = null, timeoutMs = 2500)
         )
@@ -142,7 +162,17 @@ data class AppConfig(
                 orientation = o.optString("orientation", d.orientation),
                 themeColor = color(o.optString("themeColor"), d.themeColor),
                 backgroundColor = color(o.optString("backgroundColor"), d.backgroundColor),
-                lightStatusBarIcons = o.optBoolean("lightStatusBarIcons", d.lightStatusBarIcons)
+                lightStatusBarIcons = o.optBoolean("lightStatusBarIcons", d.lightStatusBarIcons),
+                // Falls back to whatever themeColor resolved to, not to the old
+                // navigationBarColor, so an app upgraded from a config that predates
+                // this key keeps one consistent colour instead of a stale mismatch.
+                navigationBarColor = color(
+                    o.optString("navigationBarColor"),
+                    color(o.optString("themeColor"), d.navigationBarColor)
+                ),
+                hideStatusBar = o.optBoolean("hideStatusBar", d.hideStatusBar),
+                hideNavigationBar = o.optBoolean("hideNavigationBar", d.hideNavigationBar),
+                cutoutMode = o.optString("cutoutMode", d.cutoutMode)
             )
         }
 
@@ -168,7 +198,8 @@ data class AppConfig(
                 allowMixedContent = o.optBoolean("allowMixedContent", d.allowMixedContent),
                 confirmExitOnBack = o.optBoolean("confirmExitOnBack", d.confirmExitOnBack),
                 openPopupsInApp = o.optBoolean("openPopupsInApp", d.openPopupsInApp),
-                handleDownloads = o.optBoolean("handleDownloads", d.handleDownloads)
+                handleDownloads = o.optBoolean("handleDownloads", d.handleDownloads),
+                keepScreenOn = o.optBoolean("keepScreenOn", d.keepScreenOn)
             )
         }
 

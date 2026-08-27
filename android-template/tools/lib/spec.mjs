@@ -72,6 +72,30 @@ export function normaliseDisplay(display = {}) {
     themeColor: validColor(display.themeColor ?? '#0F172A', 'display.themeColor'),
     backgroundColor: validColor(display.backgroundColor ?? '#FFFFFF', 'display.backgroundColor'),
     lightStatusBarIcons: bool(display.lightStatusBarIcons, true),
+
+    // Defaults to the theme colour so an app that says nothing about the
+    // navigation bar keeps the single-colour look it had before this existed.
+    navigationBarColor: validColor(
+      display.navigationBarColor ?? display.themeColor ?? '#0F172A',
+      'display.navigationBarColor'
+    ),
+
+    // Per-bar hiding, finer than fullscreen. fullscreen still hides both and adds
+    // swipe-to-reveal; these hide one bar and leave the other in place, which
+    // fullscreen cannot express.
+    hideStatusBar: bool(display.hideStatusBar, false),
+    hideNavigationBar: bool(display.hideNavigationBar, false),
+
+    // How to treat a notch or punch-hole.
+    //   default     content stops at the cutout in portrait
+    //   shortEdges  content extends into it; pair with a dark theme colour
+    //   never       the system always letterboxes the cutout away
+    cutoutMode: validEnum(
+      display.cutoutMode,
+      ['default', 'shortEdges', 'never'],
+      'display.cutoutMode',
+      'default'
+    ),
   };
 }
 
@@ -102,6 +126,12 @@ export function normaliseBehavior(behavior = {}) {
     confirmExitOnBack: bool(behavior.confirmExitOnBack, false),
     openPopupsInApp: bool(behavior.openPopupsInApp, true),
     handleDownloads: bool(behavior.handleDownloads, true),
+
+    // Holds the screen awake while the app is in front. Uses
+    // FLAG_KEEP_SCREEN_ON, which is a window flag and needs no permission --
+    // deliberately not the WAKE_LOCK permission, which would make this a
+    // build-time capability rather than something a patch can toggle.
+    keepScreenOn: bool(behavior.keepScreenOn, false),
   };
 }
 

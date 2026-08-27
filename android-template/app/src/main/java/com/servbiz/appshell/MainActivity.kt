@@ -12,12 +12,14 @@ import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
@@ -128,28 +130,88 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
         controller.isAppearanceLightStatusBars = !config.display.lightStatusBarIcons
         controller.isAppearanceLightNavigationBars = !config.display.lightStatusBarIcons
 
-        if (config.display.fullscreen) {
-            controller.hide(WindowInsetsCompat.Type.systemBars())
+        // fullscreen stays the blunt instrument: both bars away, swipe to reveal.
+        // The per-bar flags exist for hiding one and keeping the other, which
+        // fullscreen cannot express.
+        val hideStatus = config.display.fullscreen || config.display.hideStatusBar
+        val hideNav = config.display.fullscreen || config.display.hideNavigationBar
+
+        if (hideStatus) controller.hide(WindowInsetsCompat.Type.statusBars())
+        if (hideNav) controller.hide(WindowInsetsCompat.Type.navigationBars())
+        if (hideStatus || hideNav) {
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        // Tinting the root means the strip behind the status bar shows the theme
-        // colour. Necessary because targetSdk 35 forces edge-to-edge on Android
-        // 15+, where window.statusBarColor is ignored outright.
-        binding.root.setBackgroundColor(config.display.themeColor)
+        applyCutoutMode()
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            if (config.display.fullscreen) {
-                view.setPadding(0, 0, 0, 0)
-            } else {
-                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-                // Keyboard wins over the nav bar so form fields stay reachable;
-                // adjustResize alone does not do this under edge-to-edge.
-                view.setPadding(bars.left, bars.top, bars.right, max(bars.bottom, ime.bottom))
-            }
+        // A window flag, not the WAKE_LOCK permission: it stays patchable, and the
+        // system releases it with the window rather than leaving it held.
+        if (config.behavior.keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+
+        // The root now carries the page background; the two scrims paint the strips
+        // behind the system bars. Previously the root was tinted with themeColor and
+        // padded, which meant both bars necessarily shared one colour.
+        binding.root.setBackgroundColor(config.display.backgroundColor)
+        binding.statusScrim.setBackgroundColor(config.display.themeColor)
+        binding.navScrim.setBackgroundColor(config.display.navigationBarColor)
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
+            val top = if (hideStatus) 0 else bars.top
+            // Keyboard wins over the nav bar so form fields stay reachable;
+            // adjustResize alone does not do this under edge-to-edge.
+            val bottom = max(if (hideNav) 0 else bars.bottom, ime.bottom)
+
+            // Padding moved off the root and onto the content layers, so the scrims
+            // can still occupy the inset areas.
+            binding.refresh.setPadding(bars.left, top, bars.right, bottom)
+            binding.splashOverlay.setPadding(bars.left, top, bars.right, bottom)
+
+            resize(binding.statusScrim, top)
+            // While the keyboard is up it covers the navigation bar, so a scrim
+            // sized to the nav inset would float above the keyboard instead.
+            resize(binding.navScrim, if (ime.bottom > 0 || hideNav) 0 else bars.bottom)
+
             WindowInsetsCompat.CONSUMED
+        }
+    }
+
+    /** Sets a view's height without disturbing the rest of its layout params. */
+    private fun resize(view: View, height: Int) {
+        val lp = view.layoutParams
+        if (lp.height != height) {
+            lp.height = height
+            view.layoutParams = lp
+        }
+    }
+
+    /**
+     * Whether the app may draw into a notch or punch-hole.
+     *
+     * Set in code rather than as a theme attribute so it stays on the fast-patch
+     * path -- a theme attribute is a compiled resource and would force a full
+     * rebuild. shortEdges is the only mode that reaches into the cutout, and it is
+     * worth pairing with a dark theme colour, since content then sits beside the
+     * camera.
+     */
+    private fun applyCutoutMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = when (config.display.cutoutMode) {
+                "shortEdges" ->
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                "never" ->
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+                else ->
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            }
         }
     }
 

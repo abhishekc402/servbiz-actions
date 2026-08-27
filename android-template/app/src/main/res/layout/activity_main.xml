@@ -4,6 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!--
+      Inset padding is applied to this layer, not to the root, so the two scrims
+      below can paint the strips behind the system bars in different colours. When
+      the root itself was padded there was only ever one background colour, which
+      is why the status and navigation bars could not be themed separately.
+    -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/refresh"
         android:layout_width="match_parent"
@@ -47,4 +53,29 @@
             android:layout_marginBottom="72dp"
             android:importantForAccessibility="no" />
     </FrameLayout>
+
+    <!--
+      Strips painted behind the system bars. Needed because targetSdk 35 forces
+      edge-to-edge on Android 15+, where window.statusBarColor and
+      window.navigationBarColor are ignored: the only way to colour those areas is
+      to draw something under them.
+
+      Last in the file so they sit above the WebView and the splash. Heights are
+      zero here and set from the real insets at runtime, because a hardcoded
+      24dp/48dp would be wrong on any device with a different bar size, a notch,
+      or gesture navigation.
+    -->
+    <View
+        android:id="@+id/statusScrim"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="top"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/navScrim"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="bottom"
+        android:importantForAccessibility="no" />
 </FrameLayout>

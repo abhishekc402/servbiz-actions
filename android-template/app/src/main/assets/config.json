@@ -11,7 +11,11 @@
     "orientation": "unspecified",
     "themeColor": "#0F172A",
     "backgroundColor": "#FFFFFF",
-    "lightStatusBarIcons": true
+    "lightStatusBarIcons": true,
+    "navigationBarColor": "#0F172A",
+    "hideStatusBar": false,
+    "hideNavigationBar": false,
+    "cutoutMode": "default"
   },
   "splash": {
     "backgroundColor": "#FFFFFF",
@@ -29,7 +33,8 @@
     "allowMixedContent": false,
     "confirmExitOnBack": false,
     "openPopupsInApp": true,
-    "handleDownloads": true
+    "handleDownloads": true,
+    "keepScreenOn": false
   },
   "remoteConfig": {
     "enabled": false,
