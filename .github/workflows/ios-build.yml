@@ -1,0 +1,219 @@
+# ============================================================
+# iOS app build.
+#
+# The sibling of android-build.yml, and deliberately shaped like it: same
+# dispatch + schedule triggers, same concurrency stance, same job-level env, same
+# WORKER_* budget variables. The queue is shared but mobile_app_build_claim is
+# scoped by platform, so neither workflow can claim the other's jobs.
+#
+# ── TWO JOBS, TWO RUNNER TYPES ──
+#
+#   project  An iOS app can be delivered as a configured Xcode project the
+#            customer opens on their own Mac. Producing that is templating text
+#            and writing PNGs -- no compiler runs -- so it goes on ubuntu-latest,
+#            same as Android.
+#   signed   A real .ipa needs xcodebuild, which needs macOS.
+#
+# Both are free on a public repository. They are still split, because a macOS
+# runner takes most of a minute longer to start and -- more importantly -- the two
+# jobs are trusted with different secrets. Only `signed` gets
+# CONNECTION_ENC_KEY, so the job that runs for most customers most of the time
+# cannot decrypt anyone's Apple credentials.
+#
+# The claim is also scoped by delivery, so the two jobs can run at the same time
+# without stealing each other's work.
+# ============================================================
+name: iOS app build
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: What triggered this run (for the run list)
+        required: false
+        default: api
+      dry_run:
+        description: Self-test the renderer only; claim nothing
+        required: false
+        type: boolean
+        default: false
+
+  # Safety net, same as the Android workflow. If a dispatch is ever lost -- a
+  # network blip in the API, a token expiring -- queued builds would otherwise sit
+  # forever. This costs one short run per interval to find an empty queue.
+  #
+  # It is also what will pick up anything queued before this workflow existed.
+  schedule:
+    - cron: '*/30 * * * *'
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ----------------------------------------------------------
+  # Is there anything to do, and of which kind?
+  #
+  # Asked before starting a macOS runner, because the common case is a project
+  # build that has no business waiting on one. A read, not a claim -- claiming
+  # here would check rows out to a job that is not going to build them.
+  # ----------------------------------------------------------
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ios-build
+    outputs:
+      has_project: ${{ steps.peek.outputs.has_project }}
+      has_signed: ${{ steps.peek.outputs.has_signed }}
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Peek at the queue
+        id: peek
+        working-directory: ios-template
+        run: node tools/peek-queue.mjs >> "$GITHUB_OUTPUT"
+
+  # ----------------------------------------------------------
+  # Xcode projects. Linux, no Xcode, no Apple credentials.
+  # ----------------------------------------------------------
+  project:
+    needs: triage
+    if: needs.triage.outputs.has_project == 'true' || inputs.dry_run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ios-build
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      # CONNECTION_ENC_KEY is deliberately absent. This job never builds a signed
+      # app, so it has no reason to be able to decrypt an Apple key -- and it
+      # cannot pick one up by accident, because the worker claims with a delivery
+      # filter derived from its own platform.
+      WORKER_BUDGET_MS: '840000'
+      WORKER_MAX_JOBS: '15'
+      WORKER_ID: gha-${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # No `npm install`, unlike the Android template. This worker has no
+      # dependencies at all: Supabase is reached over plain REST and R2 is signed
+      # by hand, specifically so nothing in the path that builds customers' apps
+      # needs a package tree. Keep it that way.
+
+      # Proves the renderer before it touches a customer's build. Needs no
+      # secrets, takes about a second, and a template this job cannot render
+      # should fail here rather than against a real job.
+      - name: Self-test the renderer
+        working-directory: ios-template
+        run: node tools/worker.mjs --selftest
+
+      - name: Drain the project queue
+        if: ${{ !inputs.dry_run }}
+        working-directory: ios-template
+        run: node tools/worker.mjs --drain
+
+  # ----------------------------------------------------------
+  # Signed .ipa. macOS, Xcode, the customer's Apple key.
+  # ----------------------------------------------------------
+  signed:
+    needs: triage
+    if: needs.triage.outputs.has_signed == 'true'
+    runs-on: macos-latest
+    # Generous. A cold xcodebuild archive plus a round trip to Apple for signing
+    # is minutes, and the worker's own budget stops it well before this.
+    timeout-minutes: 45
+    environment: ios-build
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      # Only this job gets it: it is the key that decrypts customers' App Store
+      # Connect credentials.
+      CONNECTION_ENC_KEY: ${{ secrets.CONNECTION_ENC_KEY }}
+      WORKER_BUDGET_MS: '2100000'
+      WORKER_MAX_JOBS: '5'
+      WORKER_ID: gha-${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Pinned rather than whatever the image defaults to. An Xcode bump changes
+      # the minimum SDK App Store Connect will accept and can change what signing
+      # does; discovering that from a customer's rejected submission is the wrong
+      # way round. Raise this deliberately.
+      #
+      # Falls back to the image default rather than failing, so a runner image
+      # that has moved on does not take the queue down -- it just logs which
+      # version it actually used.
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.app ]; then
+            sudo xcode-select -switch /Applications/Xcode_16.app
+          else
+            echo "::warning::Xcode_16.app not on this image; using the default toolchain"
+          fi
+          xcodebuild -version
+
+      - name: Self-test the renderer
+        working-directory: ios-template
+        run: node tools/worker.mjs --selftest
+
+      - name: Drain the signed queue
+        working-directory: ios-template
+        run: node tools/worker.mjs --drain
+
+      # No actions/upload-artifact on this job, at any verbosity.
+      #
+      # An xcodebuild failure leaves a .xcarchive and possibly the AuthKey .p8 in
+      # the working directory. Uploading build logs from a public repository would
+      # publish a customer's signing credential. Failures are diagnosed from the
+      # error recorded on the build row instead.
+      - name: Confirm no signing material survived
+        if: always()
+        working-directory: ios-template
+        run: |
+          set -euo pipefail
+          # Belt and braces: the worker deletes the key in a finally block, and
+          # this fails the run loudly if that ever stops being true.
+          found=$(find . \( -name 'AuthKey_*.p8' -o -name '*.mobileprovision' \) -print)
+          if [ -n "$found" ]; then
+            echo "::error::signing material was left in the workspace"
+            echo "$found"
+            exit 1
+          fi
+          echo "clean"

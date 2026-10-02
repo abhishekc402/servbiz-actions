@@ -1,0 +1,19 @@
+{
+  "name": "servbiz-ios-shell",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "iOS app shell template, project renderer, and the build worker.",
+  "//": "Separate from android-template/package.json and from the root app, for the same reason that one is: this half needs a different toolchain and has nothing to share with the React app's dependency tree.",
+  "//dependencies": "There are none, deliberately. Supabase is reached over plain REST and R2 is signed by hand (SigV4 in tools/worker.mjs), so no package tree sits in the path that renders and signs customers' apps. The Android worker carries @aws-sdk and @supabase/supabase-js; this one needs neither, and the CI workflow therefore has no npm install step. Please keep it that way.",
+  "scripts": {
+    "test": "node tools/worker.mjs --selftest",
+    "worker": "node tools/worker.mjs --drain",
+    "selftest": "node tools/worker.mjs --selftest",
+    "peek": "node tools/peek-queue.mjs"
+  },
+  "//engines": "22 to match android-template. Nothing here requires it -- the worker uses only built-ins -- but one Node version across both halves is one less thing to be surprised by.",
+  "engines": {
+    "node": ">=22"
+  }
+}
