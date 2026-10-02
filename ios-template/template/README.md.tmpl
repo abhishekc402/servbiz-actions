@@ -1,0 +1,66 @@
+# {{DISPLAY_NAME}} — iPhone app
+
+This is a complete Xcode project for your app. Everything you set in your Servbiz
+dashboard is already configured: the name, icon, colours, screen behaviour and
+permissions. You do not need to write any code.
+
+## Put it on your own iPhone
+
+You need a Mac with **Xcode** (free from the Mac App Store) and a free Apple ID.
+
+1. Unzip this folder.
+2. Open **{{PRODUCT_NAME}}.xcodeproj**.
+3. Click the project name in the left sidebar, then the **Signing & Capabilities**
+   tab. Under *Team*, choose your Apple ID. Add one with *Add an Account* if the
+   list is empty.
+4. Plug in your iPhone and pick it from the device menu at the top of the window.
+5. Press **Run** (the play button).
+
+The first time, your iPhone will refuse to open the app until you trust the
+developer certificate: on the phone, go to **Settings → General → VPN & Device
+Management**, tap your Apple ID, then **Trust**.
+
+An app signed with a free Apple ID stops working after **7 days** and has to be
+re-run from Xcode. That is Apple's limit for free accounts, not ours.
+
+## Put it on the App Store
+
+That needs the **Apple Developer Program** (99 USD a year, paid to Apple). Once
+you have it, the easiest path is to go back to your Servbiz dashboard, add your
+App Store Connect key, and choose **Signed app** — we will build the finished,
+signed file for you and you upload it.
+
+If you would rather do it here: set your paid team under *Signing &
+Capabilities*, then **Product → Archive**, then **Distribute App**.
+
+## What you are looking at
+
+| File | What it is |
+|---|---|
+| `Sources/Config.swift` | Your settings, as code. Regenerated on every build from the dashboard. |
+| `Sources/WebViewController.swift` | The screen that shows your site. |
+| `Sources/AppDelegate.swift` | App startup. |
+| `Resources/Info.plist` | Name, version, permission prompts. |
+| `Resources/Assets.xcassets` | Your icon and launch colour. |
+
+It is yours to change. If you edit it and later build again from the dashboard,
+you will get a fresh copy and your edits will not be in it — so keep your own
+version somewhere if you start making changes.
+
+## Things worth knowing
+
+**It only opens your site.** The app refuses to load any other website. That is
+deliberate: it carries your name and your customers' logged-in sessions.
+
+**Permissions are fixed at build time.** If your site starts needing the camera,
+switch it on in the dashboard and build again — it cannot be granted from inside
+the app.
+
+**Apple reviews the experience, not just the code.** An app that is only a website
+in a frame is sometimes rejected under App Store guideline 4.2 ("minimum
+functionality"). Apps with real features behind a login — ordering, booking,
+accounts — generally pass. Worth knowing before you pay for the membership.
+
+---
+
+Built for {{BUNDLE_ID}} · version {{MARKETING_VERSION}} ({{BUILD_VERSION}})
