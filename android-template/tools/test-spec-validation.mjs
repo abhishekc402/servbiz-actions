@@ -95,6 +95,13 @@ const cases = [
   [REJECT, 'keyAlias with a space',       (s) => {
     s.signing = { storeFile: '/nope/x.jks', storePassword: 'a', keyPassword: 'a', keyAlias: 'my key' };
   }],
+
+  // --- watermark: the free-credit badge, written into buildTime -----------
+  [ACCEPT, 'watermark on',                (s) => { s.watermark = true; }],
+  [ACCEPT, 'watermark off',               (s) => { s.watermark = false; }],
+  [ACCEPT, 'watermark absent',            (s) => { delete s.watermark; }],
+  [REJECT, 'watermark as a string',       (s) => { s.watermark = 'yes'; }],
+  [REJECT, 'watermark as a number',       (s) => { s.watermark = 1; }],
 ];
 
 function run() {

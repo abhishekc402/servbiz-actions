@@ -161,6 +161,7 @@ export function templateValues(spec) {
     INLINE_MEDIA: String(spec.behavior.inlineMedia),
     ALLOWS_LINK_PREVIEW: String(spec.display.allowsLinkPreview),
     KEEP_SCREEN_ON: String(spec.behavior.keepScreenOn),
+    SHOW_WATERMARK: String(spec.watermark === true),
 
     USAGE_DESCRIPTIONS: usageDescriptions(spec),
     ENCRYPTION_EXEMPT_PLIST: spec.encryptionExempt ? 'false' : 'true',

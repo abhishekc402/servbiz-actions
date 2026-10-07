@@ -15,6 +15,7 @@ final class WebViewController: UIViewController {
     private var launchView: UIView?
     private var refreshControl: UIRefreshControl?
     private var launchTimeout: DispatchWorkItem?
+    private var watermark: UIView?
 
     // MARK: - Setup
 
@@ -80,7 +81,41 @@ final class WebViewController: UIViewController {
         }
 
         showLaunchScreen()
+        if AppConfig.showWatermark { addWatermark() }
         load(AppConfig.startURL)
+    }
+
+    // MARK: - Watermark
+
+    /// The "Made with ServBiz" badge on apps made with a free ServBiz credit.
+    ///
+    /// Bottom right, inside the safe area so it clears the home indicator. It
+    /// never takes a touch: it must not get in the way of the site beneath it.
+    private func addWatermark() {
+        let label = PaddedLabel()
+        label.text = "Made with ServBiz"
+        label.font = .systemFont(ofSize: 11, weight: .bold)
+        label.textColor = .white
+        label.backgroundColor = UIColor(red: 15 / 255, green: 23 / 255, blue: 42 / 255, alpha: 0.78)
+        label.layer.cornerRadius = 11
+        label.layer.masksToBounds = true
+        label.isUserInteractionEnabled = false
+        label.isAccessibilityElement = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            label.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            label.heightAnchor.constraint(equalToConstant: 22),
+        ])
+        watermark = label
+    }
+
+    /// Covers added later (offline notice, a retried launch) go on top of
+    /// everything; the badge is put back above them.
+    private func keepWatermarkOnTop() {
+        if let badge = watermark { view.bringSubviewToFront(badge) }
     }
 
     // MARK: - Status bar
@@ -145,6 +180,7 @@ final class WebViewController: UIViewController {
 
         view.addSubview(cover)
         launchView = cover
+        keepWatermarkOnTop()
 
         let timeout = DispatchWorkItem { [weak self] in self?.hideLaunchScreen() }
         launchTimeout = timeout
@@ -207,6 +243,7 @@ final class WebViewController: UIViewController {
 
         view.addSubview(notice)
         launchView = notice
+        keepWatermarkOnTop()
     }
 
     @objc private func retry() {
@@ -362,5 +399,21 @@ extension WebViewController: WKUIDelegate {
             completionHandler(alert.textFields?.first?.text)
         })
         present(alert, animated: true)
+    }
+}
+
+// MARK: - Watermark label
+
+/// A UILabel with room around its text, for the watermark badge.
+private final class PaddedLabel: UILabel {
+    private let insets = UIEdgeInsets(top: 0, left: 9, bottom: 0, right: 9)
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: insets))
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + insets.left + insets.right, height: size.height)
     }
 }

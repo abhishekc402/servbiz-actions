@@ -24,7 +24,12 @@ data class AppConfig(
     data class BuildTime(
         val startUrl: String,
         val allowedHosts: List<String>,
-        val allowSubdomains: Boolean
+        val allowSubdomains: Boolean,
+        /**
+         * Shows the ServBiz badge, for apps made with a free credit. Here rather
+         * than in Display so remote config (merge() below) cannot remove it.
+         */
+        val watermark: Boolean = false
     )
 
     data class Display(
@@ -138,7 +143,8 @@ data class AppConfig(
                                 ?.let { add(it) }
                         }
                     },
-                    allowSubdomains = bt.optBoolean("allowSubdomains", true)
+                    allowSubdomains = bt.optBoolean("allowSubdomains", true),
+                    watermark = bt.optBoolean("watermark", false)
                 ),
                 display = parseDisplay(json.optJSONObject("display"), FALLBACK.display),
                 splash = parseSplash(json.optJSONObject("splash"), FALLBACK.splash),

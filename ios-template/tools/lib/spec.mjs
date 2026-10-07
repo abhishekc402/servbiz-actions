@@ -150,6 +150,11 @@ export function parseSpec(input = {}) {
     // flattened onto a colour. White when the customer chose none.
     iconBackgroundColor: colour(config.iconBackgroundColor, '#FFFFFF'),
     encryptionExempt: bool(config.encryptionExempt, true),
+    // The ServBiz badge for apps made with a free credit. From the job, which
+    // servbiz-main fills from mobile_apps.watermark on every build; the row is
+    // the fallback for a job queued before the field existed. Never from
+    // app.config, which is the customer's own settings.
+    watermark: (build.watermark ?? app.watermark) === true,
   }
 }
 
