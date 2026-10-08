@@ -99,8 +99,13 @@ final class WebViewController: UIViewController {
         label.backgroundColor = UIColor(red: 15 / 255, green: 23 / 255, blue: 41 / 255, alpha: 1)
         label.layer.cornerRadius = 14
         label.layer.masksToBounds = true
-        label.isUserInteractionEnabled = false
-        label.isAccessibilityElement = false
+        // Tapping opens servbiz.in in Safari, never inside the app's web view.
+        label.isUserInteractionEnabled = true
+        label.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(openWatermarkLink)))
+        label.isAccessibilityElement = true
+        label.accessibilityLabel = "Made with ServBiz"
+        label.accessibilityHint = "Opens servbiz.in"
+        label.accessibilityTraits = .link
         label.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(label)
@@ -110,6 +115,10 @@ final class WebViewController: UIViewController {
             label.heightAnchor.constraint(equalToConstant: 28),
         ])
         watermark = label
+    }
+
+    @objc private func openWatermarkLink() {
+        if let url = URL(string: "https://servbiz.in") { UIApplication.shared.open(url) }
     }
 
     /// Covers added later (offline notice, a retried launch) go on top of
