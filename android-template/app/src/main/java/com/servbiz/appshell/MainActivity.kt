@@ -193,8 +193,16 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
      * which remote config cannot change, so only a new build removes it.
      */
     private fun applyWatermark() {
-        binding.watermarkBadge.visibility =
-            if (config.buildTime.watermark) View.VISIBLE else View.GONE
+        val badge = binding.watermarkBadge
+        badge.visibility = if (config.buildTime.watermark) View.VISIBLE else View.GONE
+        // Opens servbiz.in in the browser, never inside the app's WebView.
+        badge.setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WATERMARK_URL)))
+            } catch (_: ActivityNotFoundException) {
+                // No browser installed: nothing to do.
+            }
+        }
     }
 
     private fun placeWatermark(right: Int, bottom: Int) {
@@ -857,3 +865,6 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
         const val FIRST_PAINT_PROGRESS = 70
     }
 }
+
+/** Where the free-credit badge leads. */
+private const val WATERMARK_URL = "https://servbiz.in"
