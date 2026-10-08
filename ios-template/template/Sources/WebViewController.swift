@@ -93,11 +93,11 @@ final class WebViewController: UIViewController {
     /// never takes a touch: it must not get in the way of the site beneath it.
     private func addWatermark() {
         let label = PaddedLabel()
-        label.text = "Made with ServBiz"
-        label.font = .systemFont(ofSize: 11, weight: .bold)
+        label.text = "\u{26A1} Made with ServBiz"
+        label.font = .systemFont(ofSize: 13, weight: .bold)
         label.textColor = .white
-        label.backgroundColor = UIColor(red: 15 / 255, green: 23 / 255, blue: 42 / 255, alpha: 0.78)
-        label.layer.cornerRadius = 11
+        label.backgroundColor = UIColor(red: 15 / 255, green: 23 / 255, blue: 41 / 255, alpha: 1)
+        label.layer.cornerRadius = 14
         label.layer.masksToBounds = true
         label.isUserInteractionEnabled = false
         label.isAccessibilityElement = false
@@ -107,7 +107,7 @@ final class WebViewController: UIViewController {
         NSLayoutConstraint.activate([
             label.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
             label.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
-            label.heightAnchor.constraint(equalToConstant: 22),
+            label.heightAnchor.constraint(equalToConstant: 28),
         ])
         watermark = label
     }
@@ -406,7 +406,7 @@ extension WebViewController: WKUIDelegate {
 
 /// A UILabel with room around its text, for the watermark badge.
 private final class PaddedLabel: UILabel {
-    private let insets = UIEdgeInsets(top: 0, left: 9, bottom: 0, right: 9)
+    private let insets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
 
     override func drawText(in rect: CGRect) {
         super.drawText(in: rect.inset(by: insets))
