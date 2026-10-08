@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
         registerLaunchers()
         applyWindowChrome()
         applySplashStyling()
+        applyWatermark()
         configureWebView()
         configurePullToRefresh()
         registerBackHandler()
@@ -178,8 +179,32 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
             // While the keyboard is up it covers the navigation bar, so a scrim
             // sized to the nav inset would float above the keyboard instead.
             resize(binding.navScrim, if (ime.bottom > 0 || hideNav) 0 else bars.bottom)
+            // The badge sits just inside the content area, clear of the bars and
+            // the keyboard. The listener consumes the insets, so it is placed here
+            // rather than left to find them itself.
+            placeWatermark(bars.right, bottom)
 
             WindowInsetsCompat.CONSUMED
+        }
+    }
+
+    /**
+     * The ServBiz badge on apps made with a free credit. Read from buildTime,
+     * which remote config cannot change, so only a new build removes it.
+     */
+    private fun applyWatermark() {
+        binding.watermarkBadge.visibility =
+            if (config.buildTime.watermark) View.VISIBLE else View.GONE
+    }
+
+    private fun placeWatermark(right: Int, bottom: Int) {
+        val badge = binding.watermarkBadge
+        val gap = (12 * resources.displayMetrics.density).toInt()
+        val lp = badge.layoutParams as android.widget.FrameLayout.LayoutParams
+        if (lp.marginEnd != right + gap || lp.bottomMargin != bottom + gap) {
+            lp.marginEnd = right + gap
+            lp.bottomMargin = bottom + gap
+            badge.layoutParams = lp
         }
     }
 

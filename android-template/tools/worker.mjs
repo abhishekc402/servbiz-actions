@@ -213,6 +213,10 @@ function composeSpec(app, jobSpec, versionCode, signing) {
     allowedHosts: requested.allowedHosts ?? app.allowed_hosts ?? [],
     allowSubdomains: requested.allowSubdomains ?? config.allowSubdomains ?? true,
     allowCleartextTraffic: requested.allowCleartextTraffic ?? false,
+    // The ServBiz badge for free-credit apps. The job carries it (servbiz-main
+    // copies mobile_apps.watermark into every spec); the row is the fallback for
+    // a job queued before that field existed.
+    watermark: (requested.watermark ?? app.watermark) === true,
     display: { ...(config.display ?? {}), ...(requested.display ?? {}) },
     splash: { ...(config.splash ?? {}), ...(requested.splash ?? {}) },
     behavior: { ...(config.behavior ?? {}), ...(requested.behavior ?? {}) },

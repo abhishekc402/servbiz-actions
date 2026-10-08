@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background of the ServBiz badge shown on free-credit apps: a solid navy pill. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FF0F1729" />
+    <corners android:radius="999dp" />
+</shape>

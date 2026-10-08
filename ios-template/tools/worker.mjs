@@ -46,7 +46,7 @@ import crypto from 'node:crypto'
 import zlib from 'node:zlib'
 
 import { parseSpec, SpecError } from './lib/spec.mjs'
-import { fill, renderProject, productName } from './lib/render.mjs'
+import { fill, renderProject, productName, templateValues } from './lib/render.mjs'
 import {
   flattenOntoColour, decodePng, encodePngRgb, REQUIRED_ICON_PX,
 } from './lib/icons.mjs'
@@ -562,6 +562,19 @@ async function selftest() {
 
   const spec = parseSpec({ app: baseApp, build: { delivery: 'xcode-project' } })
   check('parses a complete spec', spec.bundleId === baseApp.application_id, spec.bundleId)
+
+  // The free-credit badge: from the job, else the row, never from config.
+  check('watermark off by default', spec.watermark === false)
+  check('watermark from the job',
+    parseSpec({ app: baseApp, build: { watermark: true } }).watermark === true)
+  check('watermark falls back to the row',
+    parseSpec({ app: { ...baseApp, watermark: true }, build: {} }).watermark === true)
+  check('job can clear the row\u2019s watermark',
+    parseSpec({ app: { ...baseApp, watermark: true }, build: { watermark: false } }).watermark === false)
+  check('customer config cannot set the watermark',
+    parseSpec({ app: { ...baseApp, config: { ...baseApp.config, watermark: true } }, build: {} }).watermark === false)
+  check('watermark token renders for Swift',
+    templateValues(parseSpec({ app: baseApp, build: { watermark: true } })).SHOW_WATERMARK === 'true')
   check('defaults delivery to the project path', spec.delivery === 'xcode-project', spec.delivery)
   check('maps delivery to artifact kind', spec.artifactKind === 'xcode-project')
   check('keeps the marketing version', spec.marketingVersion === '1.2.3')
@@ -685,6 +698,9 @@ async function selftest() {
     check('status bar style mapped', config.includes('.lightContent'))
     check('orientation mask mapped', config.includes('.portrait'))
     check('splash wait is seconds not ms', config.includes('= 5.0'))
+    check('watermark off unless the job asks', config.includes('static let showWatermark = false'))
+    check('watermark badge code is in the shell',
+      (await read('Sources/WebViewController.swift')).includes('AppConfig.showWatermark'))
 
     const scheme = await read(`${product}.xcodeproj/xcshareddata/xcschemes/${product}.xcscheme`)
     check('shared scheme is written', scheme.includes(`${product}.app`))

@@ -45,6 +45,7 @@ import {
   DENSITIES,
   PERMISSION_FLAGS,
   SpecError,
+  bool,
   fail,
   normaliseBehavior,
   normaliseDisplay,
@@ -169,6 +170,14 @@ function normalisePatch(raw, current) {
     behavior: normaliseBehavior(raw.behavior ?? current.behavior),
     remoteConfig: normaliseRemoteConfig(raw.remoteConfig ?? current.remoteConfig),
   };
+
+  // The ServBiz badge is read from config.json at runtime, so a patch can carry
+  // it either way. servbiz-main sends it on every job from mobile_apps.watermark;
+  // when a patch omits it the base APK's value stands. The rest of buildTime is
+  // carried over untouched -- it is compiled-in identity a patch must not move.
+  if (raw.watermark !== undefined) {
+    next.buildTime = { ...(current.buildTime ?? {}), watermark: bool(raw.watermark, false) };
+  }
 
   // Capability flags may be withdrawn but never granted. The permission is
   // physically absent from the shipped manifest, so switching one on here would

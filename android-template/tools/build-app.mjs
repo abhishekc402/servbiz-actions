@@ -227,6 +227,11 @@ function normaliseSpec(raw) {
     allowedHosts: (Array.isArray(raw.allowedHosts) ? raw.allowedHosts : []).map(validHost),
     allowSubdomains: bool(raw.allowSubdomains, true),
 
+    // The ServBiz badge for apps made with a free credit. Set by servbiz-main
+    // from mobile_apps.watermark on every job; the customer's settings cannot
+    // reach it.
+    watermark: bool(raw.watermark, false),
+
     display: normaliseDisplay(raw.display),
     splash: normaliseSplash(raw.splash),
     behavior: normaliseBehavior(raw.behavior),
@@ -306,7 +311,8 @@ function materialiseSandbox(spec) {
 
 function writeConfigJson(sandbox, spec) {
   // Mirrors AppConfig.kt. The `buildTime` block is the set of fields remote
-  // config is structurally unable to override.
+  // config is structurally unable to override -- which is why the watermark
+  // lives there: a remote config must not be a way to remove it.
   const config = {
     configVersion: 1,
     appId: spec.appId,
@@ -314,6 +320,7 @@ function writeConfigJson(sandbox, spec) {
       startUrl: spec.startUrl,
       allowedHosts: spec.allowedHosts,
       allowSubdomains: spec.allowSubdomains,
+      watermark: spec.watermark,
     },
     display: spec.display,
     splash: spec.splash,
