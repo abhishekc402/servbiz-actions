@@ -34,7 +34,8 @@
     "confirmExitOnBack": false,
     "openPopupsInApp": true,
     "handleDownloads": true,
-    "keepScreenOn": false
+    "keepScreenOn": false,
+    "blockScreenCapture": false
   },
   "remoteConfig": {
     "enabled": false,

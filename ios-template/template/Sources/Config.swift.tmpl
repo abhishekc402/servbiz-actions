@@ -64,6 +64,9 @@ enum AppConfig {
     static let inlineMedia = {{INLINE_MEDIA}}
     static let allowsLinkPreview = {{ALLOWS_LINK_PREVIEW}}
     static let keepScreenOn = {{KEEP_SCREEN_ON}}
+    /// Hides the site while the screen is recorded or mirrored, and in the app
+    /// switcher. iOS has no way to refuse a screenshot itself.
+    static let blockScreenCapture = {{BLOCK_SCREEN_CAPTURE}}
 
     // MARK: - Watermark
 

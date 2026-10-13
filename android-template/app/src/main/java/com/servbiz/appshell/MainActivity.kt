@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
         // then opt into edge-to-edge, then inflate.
         setTheme(R.style.Theme_AppShell)
         applyOrientation()
+        applyCaptureProtection()
         enableEdgeToEdge()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -120,6 +121,21 @@ class MainActivity : AppCompatActivity(), AppWebViewClient.Host {
             "portrait" -> ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
             "landscape" -> ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
             else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    /**
+     * FLAG_SECURE: the system refuses screenshots, shows the window black in
+     * screen recordings, casts and mirroring, and blanks the recent-apps
+     * thumbnail. Set before the content is inflated so not even the first frame
+     * can be captured. Enforced by the OS, so it covers third-party recorders
+     * too; only a rooted device can get around it.
+     */
+    private fun applyCaptureProtection() {
+        if (config.behavior.blockScreenCapture) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 

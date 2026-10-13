@@ -63,7 +63,9 @@ data class AppConfig(
         val confirmExitOnBack: Boolean,
         val openPopupsInApp: Boolean,
         val handleDownloads: Boolean,
-        val keepScreenOn: Boolean
+        val keepScreenOn: Boolean,
+        /** FLAG_SECURE: no screenshots, recordings, casting or recents thumbnail. */
+        val blockScreenCapture: Boolean
     )
 
     data class Remote(
@@ -121,7 +123,8 @@ data class AppConfig(
                 confirmExitOnBack = false,
                 openPopupsInApp = true,
                 handleDownloads = true,
-                keepScreenOn = false
+                keepScreenOn = false,
+                blockScreenCapture = false
             ),
             remoteConfig = Remote(enabled = false, url = null, timeoutMs = 2500)
         )
@@ -205,7 +208,8 @@ data class AppConfig(
                 confirmExitOnBack = o.optBoolean("confirmExitOnBack", d.confirmExitOnBack),
                 openPopupsInApp = o.optBoolean("openPopupsInApp", d.openPopupsInApp),
                 handleDownloads = o.optBoolean("handleDownloads", d.handleDownloads),
-                keepScreenOn = o.optBoolean("keepScreenOn", d.keepScreenOn)
+                keepScreenOn = o.optBoolean("keepScreenOn", d.keepScreenOn),
+                blockScreenCapture = o.optBoolean("blockScreenCapture", d.blockScreenCapture)
             )
         }
 

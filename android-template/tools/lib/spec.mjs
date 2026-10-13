@@ -132,6 +132,11 @@ export function normaliseBehavior(behavior = {}) {
     // deliberately not the WAKE_LOCK permission, which would make this a
     // build-time capability rather than something a patch can toggle.
     keepScreenOn: bool(behavior.keepScreenOn, false),
+
+    // Blocks screenshots, screen recording, casting and the recent-apps
+    // thumbnail with FLAG_SECURE. Another window flag, so it needs no permission
+    // and a patch can switch it either way.
+    blockScreenCapture: bool(behavior.blockScreenCapture, false),
   };
 }
 

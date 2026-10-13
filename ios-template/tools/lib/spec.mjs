@@ -138,6 +138,9 @@ export function parseSpec(input = {}) {
       swipeNavigation: bool(behavior.swipeNavigation, true),
       inlineMedia: bool(behavior.inlineMedia, true),
       keepScreenOn: bool(behavior.keepScreenOn, false),
+      // iOS cannot refuse a screenshot. This covers the site while the screen
+      // is recorded or mirrored, and in the app switcher snapshot.
+      blockScreenCapture: bool(behavior.blockScreenCapture, false),
       allowCamera: bool(behavior.allowCamera, false),
       allowMicrophone: bool(behavior.allowMicrophone, false),
       allowGeolocation: bool(behavior.allowGeolocation, false),

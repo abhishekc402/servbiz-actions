@@ -16,6 +16,7 @@ final class WebViewController: UIViewController {
     private var refreshControl: UIRefreshControl?
     private var launchTimeout: DispatchWorkItem?
     private var watermark: UIView?
+    private var captureShield: UIView?
 
     // MARK: - Setup
 
@@ -82,7 +83,98 @@ final class WebViewController: UIViewController {
 
         showLaunchScreen()
         if AppConfig.showWatermark { addWatermark() }
+        if AppConfig.blockScreenCapture { startCaptureProtection() }
         load(AppConfig.startURL)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // The window, and with it the scene's capture state, exists only now.
+        if AppConfig.blockScreenCapture { updateCaptureShield() }
+    }
+
+    // MARK: - Screen capture protection
+
+    /// iOS gives an app no way to refuse a screenshot, so this is the most an app
+    /// can do: while the screen is being recorded, mirrored or AirPlayed, the
+    /// site is covered and its media paused, and the snapshot iOS takes for the
+    /// app switcher shows the cover rather than the page.
+    private func startCaptureProtection() {
+        let centre = NotificationCenter.default
+        centre.addObserver(
+            self, selector: #selector(updateCaptureShield),
+            name: UIScreen.capturedDidChangeNotification, object: nil
+        )
+        centre.addObserver(
+            self, selector: #selector(updateCaptureShield),
+            name: UIApplication.didBecomeActiveNotification, object: nil
+        )
+        // Before iOS snapshots the app for the switcher.
+        centre.addObserver(
+            self, selector: #selector(coverForAppSwitcher),
+            name: UIApplication.willResignActiveNotification, object: nil
+        )
+        if #available(iOS 17.0, *) {
+            registerForTraitChanges([UITraitSceneCaptureState.self]) { (self: Self, _) in
+                self.updateCaptureShield()
+            }
+        }
+        updateCaptureShield()
+    }
+
+    private var isScreenCaptured: Bool {
+        if #available(iOS 17.0, *), view.window != nil {
+            return traitCollection.sceneCaptureState == .active
+        }
+        return UIScreen.main.isCaptured
+    }
+
+    @objc private func updateCaptureShield() {
+        if isScreenCaptured {
+            showCaptureShield(message: "Screen recording isn\u{2019}t allowed in this app.")
+            if #available(iOS 15.0, *) { webView.pauseAllMediaPlayback(completionHandler: nil) }
+        } else {
+            hideCaptureShield()
+        }
+    }
+
+    @objc private func coverForAppSwitcher() {
+        if captureShield == nil { showCaptureShield(message: nil) }
+    }
+
+    private func showCaptureShield(message: String?) {
+        captureShield?.removeFromSuperview()
+
+        let shield = UIView(frame: view.bounds)
+        shield.backgroundColor = AppConfig.splashColor
+        shield.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        if let message = message {
+            let label = UILabel()
+            label.text = message
+            label.numberOfLines = 0
+            label.textAlignment = .center
+            label.textColor = .secondaryLabel
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            label.translatesAutoresizingMaskIntoConstraints = false
+            shield.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: shield.centerXAnchor),
+                label.centerYAnchor.constraint(equalTo: shield.centerYAnchor),
+                label.leadingAnchor.constraint(greaterThanOrEqualTo: shield.leadingAnchor, constant: 32),
+                label.trailingAnchor.constraint(lessThanOrEqualTo: shield.trailingAnchor, constant: -32),
+            ])
+        }
+
+        view.addSubview(shield)
+        captureShield = shield
+        UIAccessibility.post(notification: .screenChanged, argument: shield)
+    }
+
+    private func hideCaptureShield() {
+        captureShield?.removeFromSuperview()
+        captureShield = nil
     }
 
     // MARK: - Watermark
@@ -125,6 +217,8 @@ final class WebViewController: UIViewController {
     /// everything; the badge is put back above them.
     private func keepWatermarkOnTop() {
         if let badge = watermark { view.bringSubviewToFront(badge) }
+        // A recording cover stays above anything added after it.
+        if let shield = captureShield { view.bringSubviewToFront(shield) }
     }
 
     // MARK: - Status bar
